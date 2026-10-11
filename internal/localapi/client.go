@@ -25,8 +25,11 @@ func UserSocketPath() string {
 	return filepath.Join(home, ".peerlink", "peerlinkd.sock")
 }
 
-// SocketPath searches for available socket paths (system / user).
+// SocketPath searches for available socket paths (system / user / env).
 func SocketPath() string {
+	if s := os.Getenv("PEERLINK_SOCKET"); s != "" {
+		return s
+	}
 	if _, err := os.Stat(DefaultSocketPath); err == nil {
 		return DefaultSocketPath
 	}
