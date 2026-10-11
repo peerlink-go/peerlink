@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PeerLink — Yönetim Paneli</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    header { background: var(--card); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-size: 1.25rem; font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 0.5rem; }
+    .badge { background: #1e3a8a; color: #93c5fd; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; }
+    nav button { background: none; border: none; color: var(--muted); padding: 0.5rem 1rem; cursor: pointer; font-size: 0.95rem; border-radius: 6px; }
+    nav button.active { color: var(--text); background: rgba(255,255,255,0.05); }
+    main { flex: 1; padding: 2rem; max-width: 1200px; margin: 0 auto; width: 100%; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    h2 { font-size: 1.25rem; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+    td { padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .dot-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .dot-offline { background: var(--muted); }
+    button.btn { background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500; }
+    button.btn:hover { background: var(--primary-hover); }
+    button.btn-danger { background: var(--danger); }
+    .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+    .modal.open { display: flex; }
+    .modal-content { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 2rem; width: 100%; max-width: 450px; }
+    input, textarea { width: 100%; padding: 0.7rem; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); margin: 0.5rem 0 1rem; }
+    #login-view { max-width: 400px; margin: 4rem auto; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span>PeerLink</span>
+    <span class="badge">Mesh VPN</span>
+  </div>
+  <nav id="nav-tabs" style="display: none;">
+    <button class="active" onclick="showTab('nodes')">Cihazlar</button>
+    <button onclick="showTab('keys')">Auth Keys</button>
+    <button onclick="showTab('policy')">Erişim Kuralları (ACL)</button>
+    <button onclick="logout()">Çıkış Yap</button>
+  </nav>
+</header>
+
+<main>
+  <!-- GİRİŞ EKRANI -->
+  <div id="login-view" class="card">
+    <h2>Yönetici Girişi</h2>
+    <form onsubmit="handleLogin(event)">
+      <label>E-posta</label>
+      <input type="email" id="login-email" required placeholder="admin@example.com">
+      <label>Parola</label>
+      <input type="password" id="login-password" required placeholder="••••••••">
+      <button type="submit" class="btn" style="width: 100%;">Giriş Yap</button>
+      <div id="login-err" style="color: var(--danger); margin-top: 10px; font-size: 0.9rem;"></div>
+    </form>
+  </div>
+
+  <!-- CİHAZLAR TABI -->
+  <div id="nodes-tab" style="display: none;">
+    <div class="card">
+      <div class="flex-between">
+        <h2>Bağlı Cihazlar (Nodes)</h2>
+        <button class="btn btn-sm" onclick="fetchNodes()">Yenile</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Durum</th>
+            <th>Cihaz Adı</th>
+            <th>PeerLink IP</th>
+            <th>İşletim Sistemi</th>
+            <th>SSH</th>
+            <th>İşlemler</th>
+          </tr>
+        </thead>
+        <tbody id="nodes-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- AUTH KEYS TABI -->
+  <div id="keys-tab" style="display: none;">
+    <div class="card">
+      <div class="flex-between">
+        <h2>Auth Keys</h2>
+        <button class="btn btn-sm" onclick="openKeyModal()">Yeni Anahtar Üret</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Önek</th>
+            <th>Açıklama</th>
+            <th>Ön Onay</th>
+            <th>Kullanım</th>
+            <th>Geçerlilik</th>
+            <th>İşlem</th>
+          </tr>
+        </thead>
+        <tbody id="keys-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ACL TABI -->
+  <div id="policy-tab" style="display: none;">
+    <div class="card">
+      <div class="flex-between">
+        <h2>Erişim Politikası (HuJSON)</h2>
+        <button class="btn btn-sm" onclick="savePolicy()">Kaydet</button>
+      </div>
+      <p style="color: var(--muted); margin-bottom: 10px; font-size: 0.9rem;">Tailscale tarzı ACL ve SSH kurallarını yapılandırın.</p>
+      <textarea id="policy-editor" rows="18" style="font-family: monospace; font-size: 0.9rem;"></textarea>
+    </div>
+  </div>
+</main>
+
+<!-- YENİ KEY MODAL -->
+<div id="key-modal" class="modal">
+  <div class="modal-content">
+    <h2>Yeni Auth Key</h2>
+    <label>Açıklama</label>
+    <input type="text" id="key-desc" placeholder="Örn: Ev sunucusu">
+    <div style="margin-bottom: 15px;">
+      <label><input type="checkbox" id="key-preauth" checked> Ön onaylı (admin onayı gerekmez)</label><br>
+      <label><input type="checkbox" id="key-reusable"> Birden fazla cihaz için kullanılabilir</label>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn" onclick="generateKey()">Oluştur</button>
+      <button class="btn" style="background: var(--border);" onclick="closeKeyModal()">İptal</button>
+    </div>
+    <div id="key-result" style="margin-top: 15px; word-break: break-all; color: var(--success); font-family: monospace;"></div>
+  </div>
+</div>
+
+<script>
+let currentUser = null;
+
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      currentUser = data.user;
+      showApp();
+    }
+  } catch(e) {}
+}
+checkAuth();
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errDiv = document.getElementById('login-err');
+  errDiv.innerText = '';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if (res.ok) {
+      currentUser = data.user;
+      showApp();
+    } else {
+      errDiv.innerText = data.error || 'Giriş başarısız';
+    }
+  } catch(err) {
+    errDiv.innerText = 'Sunucuya bağlanılamadı';
+  }
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', {method: 'POST'});
+  location.reload();
+}
+
+function showApp() {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('nav-tabs').style.display = 'flex';
+  showTab('nodes');
+}
+
+function showTab(tab) {
+  ['nodes', 'keys', 'policy'].forEach(t => {
+    document.getElementById(t + '-tab').style.display = (t === tab) ? 'block' : 'none';
+  });
+  if (tab === 'nodes') fetchNodes();
+  if (tab === 'keys') fetchKeys();
+  if (tab === 'policy') fetchPolicy();
+}
+
+async function fetchNodes() {
+  const res = await fetch('/api/nodes');
+  const data = await res.json();
+  const tbody = document.getElementById('nodes-table-body');
+  tbody.innerHTML = '';
+  (data.nodes || []).forEach(n => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="status-dot ${n.online ? 'dot-online' : 'dot-offline'}"></span>${n.online ? 'Online' : 'Offline'}</td>
+      <td><strong>${n.name}</strong></td>
+      <td><code>${n.ipv4}</code></td>
+      <td>${n.hostinfo?.os || '-'}</td>
+      <td>${n.hostinfo?.sshEnabled ? '<span style="color:var(--success)">Aktif</span>' : '<span style="color:var(--muted)">Kapalı</span>'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteNode(${n.id})">Sil</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function deleteNode(id) {
+  if (confirm('Bu cihazı ağdan silmek istediğinize emin misiniz?')) {
+    await fetch('/api/nodes/' + id, {method: 'DELETE'});
+    fetchNodes();
+  }
+}
+
+async function fetchKeys() {
+  const res = await fetch('/api/auth-keys');
+  const data = await res.json();
+  const tbody = document.getElementById('keys-table-body');
+  tbody.innerHTML = '';
+  (data.keys || []).forEach(k => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><code>${k.prefix}...</code></td>
+      <td>${k.description || '-'}</td>
+      <td>${k.preauthorized ? 'Evet' : 'Hayır'}</td>
+      <td>${k.usedCount} kez</td>
+      <td>${new Date(k.expiresAt).toLocaleDateString()}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="revokeKey(${k.id})">İptal Et</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function openKeyModal() {
+  document.getElementById('key-modal').classList.add('open');
+  document.getElementById('key-result').innerText = '';
+}
+function closeKeyModal() {
+  document.getElementById('key-modal').classList.remove('open');
+}
+
+async function generateKey() {
+  const description = document.getElementById('key-desc').value;
+  const preauthorized = document.getElementById('key-preauth').checked;
+  const reusable = document.getElementById('key-reusable').checked;
+  const res = await fetch('/api/auth-keys', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({description, preauthorized, reusable})
+  });
+  const data = await res.json();
+  if (data.secret) {
+    document.getElementById('key-result').innerHTML = '<strong>Yeni Key (Kaydedin):</strong><br>' + data.secret;
+    fetchKeys();
+  }
+}
+
+async function revokeKey(id) {
+  if (confirm('Bu anahtarı iptal etmek istediğinize emin misiniz?')) {
+    await fetch('/api/auth-keys/' + id, {method: 'DELETE'});
+    fetchKeys();
+  }
+}
+
+async function fetchPolicy() {
+  const res = await fetch('/api/policy');
+  const data = await res.json();
+  document.getElementById('policy-editor').value = data.hujson || '';
+}
+
+async function savePolicy() {
+  const hujson = document.getElementById('policy-editor').value;
+  const res = await fetch('/api/policy', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({hujson})
+  });
+  if (res.ok) {
+    alert('Erişim politikası kaydedildi!');
+  } else {
+    const err = await res.json();
+    alert('Hata: ' + err.error);
+  }
+}
+</script>
+</body>
+</html>

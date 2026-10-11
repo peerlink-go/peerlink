@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Run Tests
+        run: go test -v ./...
+
+      - name: Build Binaries (Linux)
+        run: |
+          go build -v -o bin/peerlink-control ./cmd/peerlink-control
+          go build -v -o bin/peerlink-relay ./cmd/peerlink-relay
+          go build -v -o bin/peerlinkd ./cmd/peerlinkd
+          go build -v -o bin/peerlink ./cmd/peerlink
+
+      - name: Cross-compile (Darwin & Windows)
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -o bin/peerlink-darwin-arm64 ./cmd/peerlink
+          GOOS=windows GOARCH=amd64 go build -o bin/peerlink-windows-amd64.exe ./cmd/peerlink

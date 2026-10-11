@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  control:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.control
+    container_name: peerlink-control
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PEERLINK_URL=http://localhost:8080
+      - PEERLINK_DOMAIN=peerlink
+    volumes:
+      - control-data:/data
+    command: ["/app/peerlink-control", "serve", "-listen", ":8080", "-db", "/data/control.db", "-url", "http://localhost:8080"]
+
+  relay:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.relay
+    container_name: peerlink-relay
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+      - "3478:3478/udp"
+    command: ["/app/peerlink-relay", "-listen", ":8443", "-stun", ":3478"]
+
+volumes:
+  control-data:

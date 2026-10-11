@@ -1,0 +1,24 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts & databases
+*.db
+*.db-shm
+*.db-wal
+*.test
+
+# Go workspace & coverage
+*.out
+coverage.html
+
+# IDE & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
